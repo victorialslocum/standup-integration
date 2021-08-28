@@ -99,7 +99,7 @@ async function addItem(title, text, userId, ts, tags) {
     console.log("Success! Entry added.");
     return response.url;
   } catch (error) {
-    console.error(error.body);
+    console.error(error);
   }
 }
 
@@ -118,11 +118,11 @@ async function findDatabaseItem(threadts) {
     console.log(response.results[0].id);
     return response.results[0].id;
   } catch (error) {
-    console.error(error.body);
+    console.error(error);
   }
 }
 
-async function addBody(id, text, userId) {
+async function addBody(id, text, user) {
   try {
     const response = await notion.blocks.children.append({
       block_id: id,
@@ -135,7 +135,7 @@ async function addBody(id, text, userId) {
               {
                 type: "text",
                 text: {
-                  content: "@" + slackNotionId[userId] + " says: " + text,
+                  content: "@" + user + " says: " + text,
                 },
               },
             ],
@@ -145,7 +145,7 @@ async function addBody(id, text, userId) {
     });
     console.log(response);
   } catch (error) {
-    console.error(error.body);
+    console.error(error);
   }
 }
 
@@ -183,27 +183,27 @@ app.event("message", async ({ event, client }) => {
     if (tags != undefined) {
       tags = tags.slice(6);
       tags = tags.split(", ");
+    } else {
+      tags = []
     }
     var title = event.text.split("\n")[0];
     if (title != undefined) {
       title = title.slice(0, 50);
     }
 
-    const userIdentity = await app.client.users.identity({
+    const userIdentity = await app.client.users.profile.get({
       // The token you used to initialize your app
-      userToken: userToken,
+      token: userToken,
+      user: event.user,
     });
 
-    // const userName = userIdentity.user.name
-    console.log(userIdentity)
-    // console.log(userName)
-
+    const userName = userIdentity.profile.display_name
     try {
       console.log(event);
       if ("thread_ts" in event) {
         const pageId = await findDatabaseItem(event.thread_ts);
         console.log(pageId);
-        addBody(pageId, event.text, event.user);
+        addBody(pageId, event.text, userName);
       } else {
         const notionItem = await addItem(
           title,
