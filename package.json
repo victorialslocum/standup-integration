@@ -1,0 +1,15 @@
+{
+    "name": "notion-slack-integration",
+    "type": "module",
+    "version": "1.0.0",
+    "description": "",
+    "main": "app.js",
+    "scripts": {
+        "start": "nodemon -r dotenv/config app.js"
+    },
+    "dependencies": {
+        "@notionhq/client": "^0.1.9",
+        "@slack/bolt": "^3.6.0",
+        "dotenv": "^10.0.0"
+    }
+}
