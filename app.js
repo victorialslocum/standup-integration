@@ -29,7 +29,7 @@ const notion = new Client({ auth: process.env.NOTION_KEY });
 
 const databaseId = process.env.NOTION_DATABASE_ID;
 
-async function addItem(title, text, userId, ts, tags) {
+async function addItem(title, text, userId, ts, tags, link) {
   try {
     const tagArray = [];
 
@@ -77,7 +77,19 @@ async function addItem(title, text, userId, ts, tags) {
           type: "multi_select",
           multi_select: tagArray,
         },
+        "Link to Slack": {
+          type: "rich_text",
+          rich_text: [
+            {
+              type: "text",
+              text: {
+                content: link,
+              },
+            },
+          ],
+        },
       },
+      
       children: [
         {
           object: "block",
@@ -97,7 +109,7 @@ async function addItem(title, text, userId, ts, tags) {
     });
     console.log(response);
     console.log("Success! Entry added.");
-    return response.url;
+    return response.url
   } catch (error) {
     console.error(error);
   }
@@ -115,7 +127,6 @@ async function findDatabaseItem(threadts) {
       },
     });
     console.log(response);
-    console.log(response.results[0].id);
     return response.results[0].id;
   } catch (error) {
     console.error(error);
@@ -135,7 +146,7 @@ async function addBody(id, text, user) {
               {
                 type: "text",
                 text: {
-                  content: "@" + user + " says: " + text,
+                  content: "@" + user + " replied: '" + text + "'",
                 },
               },
             ],
@@ -161,10 +172,6 @@ async function findConversation(name) {
     for (const channel of result.channels) {
       if (channel.name === name) {
         conversationId = channel.id;
-
-        // Print result
-        console.log("Found conversation ID: " + conversationId);
-        // Break from for loop
         break;
       }
     }
@@ -174,9 +181,26 @@ async function findConversation(name) {
   }
 }
 
-const standupId = await findConversation("test-standup");
+const standupId = await findConversation("standup");
 
-// When a user joins the team, send a message in a predefined channel asking them to introduce themselves
+async function replyMessage(id, ts, link) {
+  try {
+    // Call the chat.postMessage method using the built-in WebClient
+    const result = await app.client.chat.postMessage({
+      // The token you used to initialize your app
+      token: token,
+      channel: id,
+      thread_ts: ts,
+      text: link
+    });
+
+    console.log(result);
+  }
+  catch (error) {
+    console.error(error);
+  }
+}
+
 app.event("message", async ({ event, client }) => {
   if (event.channel == standupId) {
     var tags = event.text.split("\n")[1];
@@ -192,17 +216,20 @@ app.event("message", async ({ event, client }) => {
     }
 
     const userIdentity = await app.client.users.profile.get({
-      // The token you used to initialize your app
       token: userToken,
       user: event.user,
     });
 
+    const slackLink = await app.client.chat.getPermalink({
+      token: token, 
+      channel: event.channel,
+      message_ts: event.ts
+    })
+
     const userName = userIdentity.profile.display_name
     try {
-      console.log(event);
       if ("thread_ts" in event) {
         const pageId = await findDatabaseItem(event.thread_ts);
-        console.log(pageId);
         addBody(pageId, event.text, userName);
       } else {
         const notionItem = await addItem(
@@ -210,10 +237,12 @@ app.event("message", async ({ event, client }) => {
           event.text,
           event.user,
           event.ts,
-          tags
+          tags,
+          slackLink.permalink
         );
 
         console.log(notionItem);
+        replyMessage(standupId, event.ts, notionItem)
       }
     } catch (error) {
       console.error(error);
