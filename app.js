@@ -199,7 +199,7 @@ async function findConversation(name) {
   }
 }
 
-const standupId = await findConversation("test-standup");
+const standupId = await findConversation("standup");
 
 async function replyMessage(id, ts, link) {
   try {
