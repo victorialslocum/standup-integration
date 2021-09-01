@@ -89,7 +89,7 @@ async function addItem(title, text, userId, ts, tags, link) {
           ],
         },
       },
-      
+
       children: [
         {
           object: "block",
@@ -109,7 +109,7 @@ async function addItem(title, text, userId, ts, tags, link) {
     });
     console.log(response);
     console.log("Success! Entry added.");
-    return response.url
+    return response.url;
   } catch (error) {
     console.error(error);
   }
@@ -127,6 +127,14 @@ async function findDatabaseItem(threadts) {
       },
     });
     console.log(response);
+
+    const blockId = response.results[0].id;
+    const children = await notion.blocks.children.list({
+      block_id: blockId,
+      page_size: 50,
+    });
+    console.log(children.results[2].paragraph);
+
     return response.results[0].id;
   } catch (error) {
     console.error(error);
@@ -143,6 +151,16 @@ async function addBody(id, text, user) {
           type: "paragraph",
           paragraph: {
             text: [
+              // {
+              //   type: 'mention',
+              //   mention: {
+              //     type: 'user',
+              //     user: {
+              //       object: 'user',
+              //       id: slackNotionId[user],
+              //     }
+              //   }
+              // },
               {
                 type: "text",
                 text: {
@@ -181,7 +199,7 @@ async function findConversation(name) {
   }
 }
 
-const standupId = await findConversation("standup");
+const standupId = await findConversation("test-standup");
 
 async function replyMessage(id, ts, link) {
   try {
@@ -191,25 +209,31 @@ async function replyMessage(id, ts, link) {
       token: token,
       channel: id,
       thread_ts: ts,
-      text: link
+      text: link,
     });
 
     console.log(result);
-  }
-  catch (error) {
+  } catch (error) {
     console.error(error);
   }
 }
 
+const findTags = (text) => {
+  let tags = [];
+  let index = text.toLowerCase().search("tags: ");
+  if (index != -1) {
+    index += 6;
+    const tagList = text.slice(index, text.length).split("\n")[0];
+    tags = tagList.split(", ");
+  }
+  return tags;
+};
+
 app.event("message", async ({ event, client }) => {
+  console.log("event: ", event);
   if (event.channel == standupId) {
-    var tags = event.text.split("\n")[1];
-    if (tags != undefined) {
-      tags = tags.slice(6);
-      tags = tags.split(", ");
-    } else {
-      tags = []
-    }
+    var tags = await findTags(event.text);
+
     var title = event.text.split("\n")[0];
     if (title != undefined) {
       title = title.slice(0, 50);
@@ -221,12 +245,12 @@ app.event("message", async ({ event, client }) => {
     });
 
     const slackLink = await app.client.chat.getPermalink({
-      token: token, 
+      token: token,
       channel: event.channel,
-      message_ts: event.ts
-    })
+      message_ts: event.ts,
+    });
 
-    const userName = userIdentity.profile.display_name
+    const userName = userIdentity.profile.display_name;
     try {
       if ("thread_ts" in event) {
         const pageId = await findDatabaseItem(event.thread_ts);
@@ -242,7 +266,7 @@ app.event("message", async ({ event, client }) => {
         );
 
         console.log(notionItem);
-        replyMessage(standupId, event.ts, notionItem)
+        replyMessage(standupId, event.ts, notionItem);
       }
     } catch (error) {
       console.error(error);
