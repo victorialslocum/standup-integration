@@ -47,7 +47,7 @@ const replaceEmojis = (string) => {
       }
     }
   });
-  string = string.replace(/:/gi, "")
+  string = string.replace(/:/gi, "");
   return string;
 };
 
@@ -100,6 +100,7 @@ const newCodeItem = (codeText) => {
 };
 
 const newChild = (splitItem) => {
+  console.log(splitItem)
   var notionAppendItem = [];
 
   splitItem.forEach((item) => {
@@ -122,10 +123,18 @@ const newChild = (splitItem) => {
     } else if (item.search("`") != -1) {
       item = item.replace("\n", "");
       var splitString = item.split("`");
+      console.log(splitString);
       const textItem = newTextItem(splitString[0]);
       notionAppendItem.push(textItem);
+      console.log(textItem);
       const codeItem = newCodeItem(splitString[1]);
       notionAppendItem.push(codeItem);
+      console.log(codeItem);
+      if (splitString[2] != undefined) {
+        const textItem2 = newTextItem(splitString[2]);
+        notionAppendItem.push(textItem2);
+        console.log(textItem2);
+      }
     } else {
       item = item.replace("\n", "");
       const textItem = newTextItem(item);
@@ -363,7 +372,7 @@ async function findConversation(name) {
   }
 }
 
-const standupId = await findConversation("standup");
+const standupId = await findConversation("test-standup");
 
 async function replyMessage(id, ts, link) {
   try {
@@ -393,37 +402,32 @@ const findTags = (text) => {
 
 const makeTitle = (text) => {
   var title = text.split(/[\n\!\?]/)[0];
-  title = replaceEmojis(title)
-  var newTitle = "";
-  if (text != title) {
-    title = title.slice(0, 100);
-    if (title.search("http") != -1 || title.search("mailto") != -1) {
-      var regex = new RegExp(/[\<\>]/);
-      var split = title.split(regex);
+  title = replaceEmojis(title);
+  title = title.slice(0, 100);
+  if (title.search("http") != -1 || title.search("mailto") != -1) {
+    var regex = new RegExp(/[\<\>]/);
+    var split = title.split(regex);
+    title = "";
 
-      console.log(split)
-      split.forEach((line) => {
-        if (line.search("http") != -1 || line.search("mailto") != -1) {
-          let lineSplit = line.split("|");
-          console.log(lineSplit)
-          newTitle += lineSplit[1];
-        } else {
-          newTitle += line;
-        }
-      });
-    }
-  } else {
-    newTitle = title;
+    split.forEach((line) => {
+      if (line.search("http") != -1 || line.search("mailto") != -1) {
+        let lineSplit = line.split("|");
+        title += lineSplit[1];
+      } else {
+        title += line;
+      }
+    });
   }
-  newTitle = newTitle.split(".")
-  return newTitle[0];
+  title = title.split(".");
+  return title[0];
 };
 
 app.event("message", async ({ event, client }) => {
+  console.log(event);
   if (event.channel == standupId) {
     var tags = await findTags(event.text);
 
-    const title = await makeTitle(event.text)
+    const title = await makeTitle(event.text);
 
     const slackLink = await app.client.chat.getPermalink({
       token: token,
