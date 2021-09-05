@@ -13,6 +13,12 @@ const app = new App({
   socketMode: true,
 });
 
+import { Client } from "@notionhq/client";
+
+const notion = new Client({ auth: process.env.NOTION_KEY });
+
+const databaseId = process.env.NOTION_DATABASE_ID;
+
 const slackNotionId = {
   UT9G67J1Z: "f2ca3fc5-9ca1-46ed-be8b-fb618c56558a",
   U0185FAF1T5: "6718f0c7-f6e3-4c3a-9f65-e8344806b5b6",
@@ -23,11 +29,215 @@ const slackNotionId = {
   UT9G67YFM: "6c3a6ec1-4b99-4e5c-8214-cea14fd9b142",
 };
 
-import { Client } from "@notionhq/client";
+import he from "he";
 
-const notion = new Client({ auth: process.env.NOTION_KEY });
+import fs from "fs";
+import { timeLog } from "console";
 
-const databaseId = process.env.NOTION_DATABASE_ID;
+let rawdata = fs.readFileSync("./slack_emoticons_to_html_unicode.json");
+let emojis = JSON.parse(rawdata);
+
+const replaceEmojis = (string) => {
+  var splitString = string.split(" ");
+  splitString.forEach((word) => {
+    for (var key in emojis) {
+      if (word.search(":" + key + ":") != -1) {
+        var regexKey = new RegExp(key, "gi");
+        string = string.replace(regexKey, he.decode(emojis[key]));
+      }
+    }
+  });
+  string = string.replace(/:/gi, "")
+  return string;
+};
+
+const newLinkItem = (plainText, link) => {
+  var array = {
+    type: "text",
+    text: {
+      content: plainText,
+      link: {
+        type: "url",
+        url: link,
+      },
+    },
+  };
+  return array;
+};
+
+const newTextItem = (text) => {
+  var array = {
+    type: "text",
+    text: {
+      content: text,
+    },
+  };
+  return array;
+};
+
+const newUserItem = (slackUserID, idDatabase) => {
+  var array = {
+    type: "mention",
+    mention: {
+      type: "user",
+      user: { id: idDatabase[slackUserID] },
+    },
+  };
+  return array;
+};
+
+const newCodeItem = (codeText) => {
+  var array = {
+    type: "text",
+    text: {
+      content: codeText,
+    },
+    annotations: {
+      code: true,
+    },
+  };
+  return array;
+};
+
+const newChild = (splitItem) => {
+  var notionAppendItem = [];
+
+  splitItem.forEach((item) => {
+    if (item.search("http") != -1) {
+      item = item.replace("\n", "");
+      let linkSplit = item.split("|");
+
+      const notionLinkItem = newLinkItem(linkSplit[1], linkSplit[0]);
+      notionAppendItem.push(notionLinkItem);
+    } else if (item.search(":") != -1) {
+      item = item.replace("\n", "");
+      var string = replaceEmojis(item);
+      const textItem = newTextItem(string);
+      notionAppendItem.push(textItem);
+    } else if (item.search("@") != -1) {
+      item = item.replace("\n", "");
+      var string = item.replace("@", "");
+      const userItem = newUserItem(string, slackNotionId);
+      notionAppendItem.push(userItem);
+    } else if (item.search("`") != -1) {
+      item = item.replace("\n", "");
+      var splitString = item.split("`");
+      const textItem = newTextItem(splitString[0]);
+      notionAppendItem.push(textItem);
+      const codeItem = newCodeItem(splitString[1]);
+      notionAppendItem.push(codeItem);
+    } else {
+      item = item.replace("\n", "");
+      const textItem = newTextItem(item);
+      notionAppendItem.push(textItem);
+    }
+  });
+  return notionAppendItem;
+};
+
+const newNotionItem = (slackMessage, userId) => {
+  var newLineSplit = slackMessage.split("\n");
+  newLineSplit = newLineSplit.filter(Boolean);
+
+  const emptyBlock = {
+    object: "block",
+    type: "paragraph",
+    paragraph: {
+      text: [
+        {
+          type: "text",
+          text: {
+            content: "",
+          },
+        },
+      ],
+    },
+  };
+
+  const notionItem = [
+    {
+      object: "block",
+      type: "paragraph",
+      paragraph: {
+        text: [
+          {
+            type: "mention",
+            mention: {
+              type: "user",
+              user: { id: slackNotionId[userId] },
+            },
+          },
+          {
+            type: "text",
+            text: {
+              content: " says:",
+            },
+          },
+        ],
+      },
+    },
+  ];
+
+  newLineSplit.forEach((line) => {
+    var regex = new RegExp(/[\<\>]/);
+
+    var split = line.split(regex);
+
+    var item = newChild(split);
+
+    const childItem = {
+      object: "block",
+      type: "paragraph",
+      paragraph: { text: item },
+    };
+
+    notionItem.push(childItem);
+  });
+
+  notionItem.push(emptyBlock);
+  return notionItem;
+};
+
+const initialNotionItem = (slackMessage, userId) => {
+  var newLineSplit = slackMessage.split("\n");
+  newLineSplit = newLineSplit.filter(Boolean);
+
+  const emptyBlock = {
+    object: "block",
+    type: "paragraph",
+    paragraph: {
+      text: [
+        {
+          type: "text",
+          text: {
+            content: "",
+          },
+        },
+      ],
+    },
+  };
+
+  const notionItem = [];
+
+  newLineSplit.forEach((line) => {
+    var regex = new RegExp(/[\<\>]/);
+
+    var split = line.split(regex);
+
+    var item = newChild(split);
+
+    const childItem = {
+      object: "block",
+      type: "paragraph",
+      paragraph: { text: item },
+    };
+
+    notionItem.push(childItem);
+  });
+
+  notionItem.push(emptyBlock);
+  return notionItem;
+};
 
 async function addItem(title, text, userId, ts, tags, link) {
   try {
@@ -36,8 +246,6 @@ async function addItem(title, text, userId, ts, tags, link) {
     for (const tag of tags) {
       tagArray.push({ name: tag });
     }
-
-    console.log(tagArray);
 
     const response = await notion.pages.create({
       parent: { database_id: databaseId },
@@ -90,25 +298,8 @@ async function addItem(title, text, userId, ts, tags, link) {
         },
       },
 
-      children: [
-        {
-          object: "block",
-          type: "paragraph",
-          paragraph: {
-            text: [
-              {
-                type: "text",
-                text: {
-                  content: text,
-                },
-              },
-            ],
-          },
-        },
-      ],
+      children: initialNotionItem(text, userId),
     });
-    console.log(response);
-    console.log("Success! Entry added.");
     return response.url;
   } catch (error) {
     console.error(error);
@@ -126,14 +317,13 @@ async function findDatabaseItem(threadts) {
         },
       },
     });
-    console.log(response);
 
-    const blockId = response.results[0].id;
-    const children = await notion.blocks.children.list({
-      block_id: blockId,
-      page_size: 50,
-    });
-    console.log(children.results[2].paragraph);
+    // const blockId = response.results[0].id;
+    // const children = await notion.blocks.children.list({
+    //   block_id: blockId,
+    //   page_size: 50,
+    // });
+    // console.log(children.results);
 
     return response.results[0].id;
   } catch (error) {
@@ -141,38 +331,12 @@ async function findDatabaseItem(threadts) {
   }
 }
 
-async function addBody(id, text, user) {
+async function addBody(id, text, userId) {
   try {
     const response = await notion.blocks.children.append({
       block_id: id,
-      children: [
-        {
-          object: "block",
-          type: "paragraph",
-          paragraph: {
-            text: [
-              // {
-              //   type: 'mention',
-              //   mention: {
-              //     type: 'user',
-              //     user: {
-              //       object: 'user',
-              //       id: slackNotionId[user],
-              //     }
-              //   }
-              // },
-              {
-                type: "text",
-                text: {
-                  content: "@" + user + " replied: '" + text + "'",
-                },
-              },
-            ],
-          },
-        },
-      ],
+      children: newNotionItem(text, userId),
     });
-    console.log(response);
   } catch (error) {
     console.error(error);
   }
@@ -211,8 +375,6 @@ async function replyMessage(id, ts, link) {
       thread_ts: ts,
       text: link,
     });
-
-    console.log(result);
   } catch (error) {
     console.error(error);
   }
@@ -229,20 +391,39 @@ const findTags = (text) => {
   return tags;
 };
 
+const makeTitle = (text) => {
+  var title = text.split(/[\n\!\?]/)[0];
+  title = replaceEmojis(title)
+  var newTitle = "";
+  if (text != title) {
+    title = title.slice(0, 100);
+    if (title.search("http") != -1 || title.search("mailto") != -1) {
+      var regex = new RegExp(/[\<\>]/);
+      var split = title.split(regex);
+
+      console.log(split)
+      split.forEach((line) => {
+        if (line.search("http") != -1 || line.search("mailto") != -1) {
+          let lineSplit = line.split("|");
+          console.log(lineSplit)
+          newTitle += lineSplit[1];
+        } else {
+          newTitle += line;
+        }
+      });
+    }
+  } else {
+    newTitle = title;
+  }
+  newTitle = newTitle.split(".")
+  return newTitle[0];
+};
+
 app.event("message", async ({ event, client }) => {
-  console.log("event: ", event);
   if (event.channel == standupId) {
     var tags = await findTags(event.text);
 
-    var title = event.text.split("\n")[0];
-    if (title != undefined) {
-      title = title.slice(0, 50);
-    }
-
-    const userIdentity = await app.client.users.profile.get({
-      token: userToken,
-      user: event.user,
-    });
+    const title = await makeTitle(event.text)
 
     const slackLink = await app.client.chat.getPermalink({
       token: token,
@@ -250,11 +431,10 @@ app.event("message", async ({ event, client }) => {
       message_ts: event.ts,
     });
 
-    const userName = userIdentity.profile.display_name;
     try {
       if ("thread_ts" in event) {
         const pageId = await findDatabaseItem(event.thread_ts);
-        addBody(pageId, event.text, userName);
+        addBody(pageId, event.text, event.user);
       } else {
         const notionItem = await addItem(
           title,
@@ -265,7 +445,6 @@ app.event("message", async ({ event, client }) => {
           slackLink.permalink
         );
 
-        console.log(notionItem);
         replyMessage(standupId, event.ts, notionItem);
       }
     } catch (error) {
