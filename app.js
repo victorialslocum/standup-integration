@@ -2,10 +2,12 @@
 import pkg from "@slack/bolt";
 const { App } = pkg;
 
-var token = process.env.SLACK_BOT_TOKEN;
-var appToken = process.env.SLACK_APP_TOKEN;
-var userToken = process.env.SLACK_USER_TOKEN;
+// create variables for Slack Bot, App, and User tokens
+const token = process.env.SLACK_BOT_TOKEN;
+const appToken = process.env.SLACK_APP_TOKEN;
+const userToken = process.env.SLACK_USER_TOKEN;
 
+// create Slack app
 const app = new App({
   token: token,
   appToken: appToken,
@@ -13,12 +15,14 @@ const app = new App({
   socketMode: true,
 });
 
+// create Notion client
 import { Client } from "@notionhq/client";
-
 const notion = new Client({ auth: process.env.NOTION_KEY });
 
+// create variable for database ID
 const databaseId = process.env.NOTION_DATABASE_ID;
 
+// Slack user ID to Notion user ID dictionary
 const slackNotionId = {
   UT9G67J1Z: "f2ca3fc5-9ca1-46ed-be8b-fb618c56558a",
   U0185FAF1T5: "6718f0c7-f6e3-4c3a-9f65-e8344806b5b6",
@@ -29,27 +33,41 @@ const slackNotionId = {
   UT9G67YFM: "6c3a6ec1-4b99-4e5c-8214-cea14fd9b142",
 };
 
+// for emojis
 import he from "he";
-
 import fs from "fs";
 
+// import slack to html emoji dictionary
 let rawdata = fs.readFileSync("./slack_emoticons_to_html_unicode.json");
 let emojis = JSON.parse(rawdata);
 
+// following functions are for converting Slack to Notion Item
+// replace the emojis codes (from Slack) in the text with actual emojis
 const replaceEmojis = (string) => {
+  // split string based on words
   var splitString = string.split(" ");
+
+  // for each word in the string:
+  // see if the word has the emoji marker ":"
+  // search keys in the emoji for the word
+  // replace the word with the decoded html value
   splitString.forEach((word) => {
-    for (var key in emojis) {
-      if (word.search(":" + key + ":") != -1) {
-        var regexKey = new RegExp(key, "gi");
-        string = string.replace(regexKey, he.decode(emojis[key]));
+    if (word.search(":") != -1) {
+      for (var key in emojis) {
+        if (word.search(":" + key + ":") != -1) {
+          var regexKey = new RegExp(key);
+          string = string.replace(regexKey, he.decode(emojis[key]));
+        }
       }
     }
   });
+
+  // replace all the ":" in the string and return
   string = string.replace(/:/gi, "");
   return string;
 };
 
+// create a new Notion block item for links
 const newLinkItem = (plainText, link) => {
   var array = {
     type: "text",
@@ -64,6 +82,7 @@ const newLinkItem = (plainText, link) => {
   return array;
 };
 
+// create a new Notion block item for text
 const newTextItem = (text) => {
   var array = {
     type: "text",
@@ -74,6 +93,7 @@ const newTextItem = (text) => {
   return array;
 };
 
+// create a new Notion block item for users
 const newUserItem = (slackUserID, idDatabase) => {
   var array = {
     type: "mention",
@@ -85,6 +105,7 @@ const newUserItem = (slackUserID, idDatabase) => {
   return array;
 };
 
+// create a new Notion block item for code
 const newCodeItem = (codeText) => {
   var array = {
     type: "text",
@@ -98,6 +119,7 @@ const newCodeItem = (codeText) => {
   return array;
 };
 
+// create a new Notion block item for bold text
 const newBoldItem = (codeText) => {
   var array = {
     type: "text",
@@ -111,6 +133,7 @@ const newBoldItem = (codeText) => {
   return array;
 };
 
+// create a new Notion block item for code text
 const newItalicItem = (codeText) => {
   var array = {
     type: "text",
@@ -124,6 +147,7 @@ const newItalicItem = (codeText) => {
   return array;
 };
 
+// create a new Notion block item for strikethrough text
 const newStrikeItem = (codeText) => {
   var array = {
     type: "text",
@@ -137,24 +161,40 @@ const newStrikeItem = (codeText) => {
   return array;
 };
 
+// create a new child of a page with different blocks
 const newChild = (splitItem) => {
-  var notionAppendItem = [];
+  // create the Item
+  var notionItem = [];
 
+  // the input is a split item based on (/[\<\>]/), and then for each item
+  // both links and users are indicated by <text>
   splitItem.forEach((item) => {
     if ((item.search(/https?/) != -1) | (item.search(/mailto/) != -1)) {
-      item = item.replace("\n", "");
+      // see if its a link item by searching for link text indicators
+
+      // split link into text and link
       let linkSplit = item.split("|");
 
-      const notionLinkItem = newLinkItem(linkSplit[1], linkSplit[0]);
-      notionAppendItem.push(notionLinkItem);
+      // create link item and push to notionItem
+      const linkItem = newLinkItem(linkSplit[1], linkSplit[0]);
+      notionItem.push(linkItem);
     } else if (item.search("@") != -1) {
-      item = item.replace("\n", "");
+      // see if it is a user by searching for the @ symbol
+
+      // replace indicator symbol
       var string = item.replace("@", "");
+
+      // create a new user item and push to notionItem
       const userItem = newUserItem(string, slackNotionId);
-      notionAppendItem.push(userItem);
+      notionItem.push(userItem);
     } else if (item.search(/[\`\_\*\~]/) != -1) {
+      // if a string contains any special annotations (bold, italic, code, strikethrough)
+
+      // replace any emojis in string
       item = replaceEmojis(item);
-      item = item.replace(/\n/gi, "");
+
+      // kinda wack, but replace all the symbols with = on either end
+      // so it can break without getting rid of the original symbol
       item = item.replace(/[\*](?=[a-zA-Z0-9])/, "=*");
       item = item.replace(/(?<=[a-zA-Z0-9,])[\*]/, "*=");
       item = item.replace(/[\`](?=[a-zA-Z0-9])/, "=`");
@@ -163,47 +203,49 @@ const newChild = (splitItem) => {
       item = item.replace(/(?<=[a-zA-Z0-9,])[\_]/, "_=");
       item = item.replace(/[\~](?=[a-zA-Z0-9])/, "=~");
       item = item.replace(/(?<=[a-zA-Z0-9,])[\~]/, "~=");
-      // item = item.replace(/\n/gi, "");
+
+      // split item based off of =
       var split = item.split(/(\=)/gi);
 
+      // filter out any remaining "="
       split = split.filter((test) => test.search("=") != 0);
+
+      // for each item, check to see what type it is, replace the indicator, and push to notionItem
       split.forEach((split) => {
         if (split.search("`") != -1) {
           split = split.replace(/\`/gi, "");
           const item = newCodeItem(split);
-          notionAppendItem.push(item);
+          notionItem.push(item);
         } else if (split.search("_") != -1) {
           split = split.replace(/\_/gi, "");
           const item = newItalicItem(split);
-          notionAppendItem.push(item);
+          notionItem.push(item);
         } else if (split.search(/[\*]/) != -1) {
           split = split.replace(/\*/gi, "");
           const item = newBoldItem(split);
-          notionAppendItem.push(item);
+          notionItem.push(item);
         } else if (split.search("~") != -1) {
           split = split.replace(/\~/gi, "");
           const item = newStrikeItem(split);
-          notionAppendItem.push(item);
+          notionItem.push(item);
         } else {
-          split = split.replace(/=/gi, "");
           const textItem = newTextItem(split);
-          notionAppendItem.push(textItem);
+          notionItem.push(textItem);
         }
       });
     } else {
-      item = item.replace("\n", "");
+      // if the string is normal, then replace emojis and push text item
       var string = replaceEmojis(item);
       const textItem = newTextItem(string);
-      notionAppendItem.push(textItem);
+      notionItem.push(textItem);
     }
   });
-  return notionAppendItem;
+  return notionItem;
 };
 
+// create a new Notion item
 const newNotionItem = (slackMessage, userId) => {
-  var newLineSplit = slackMessage.split("\n");
-  newLineSplit = newLineSplit.filter(Boolean);
-
+  // empty block for spacing
   const emptyBlock = {
     object: "block",
     type: "paragraph",
@@ -219,6 +261,7 @@ const newNotionItem = (slackMessage, userId) => {
     },
   };
 
+  // notion Item for replies
   const notionItem = [
     {
       object: "block",
@@ -243,25 +286,35 @@ const newNotionItem = (slackMessage, userId) => {
     },
   ];
 
+  // split message on line breaks and filter empty lines
+  var newLineSplit = slackMessage.split("\n");
+  newLineSplit = newLineSplit.filter(Boolean);
+
+  // for each line in Slack message
   newLineSplit.forEach((line) => {
+    // split line based on link/user indicators
     var regex = new RegExp(/[\<\>]/);
-
     var split = line.split(regex);
-    var item = newChild(split);
 
+    // create new child item content
+    var item = newChild(split);
+    // add child item content to formatted block
     const childItem = {
       object: "block",
       type: "paragraph",
       paragraph: { text: item },
     };
 
+    // push child to notionItem
     notionItem.push(childItem);
   });
 
+  // add an empty block for spacing and return
   notionItem.push(emptyBlock);
   return notionItem;
 };
 
+// same thing as above except for inital messages not replies
 const initialNotionItem = (slackMessage, userId) => {
   var newLineSplit = slackMessage.split("\n");
   newLineSplit = newLineSplit.filter(Boolean);
@@ -281,6 +334,7 @@ const initialNotionItem = (slackMessage, userId) => {
     },
   };
 
+  // empty Notion Item instead of reply format
   const notionItem = [];
 
   newLineSplit.forEach((line) => {
@@ -301,14 +355,46 @@ const initialNotionItem = (slackMessage, userId) => {
   return notionItem;
 };
 
+// find Slack channel
+async function findConversation(name) {
+  try {
+    var conversationId = "";
+  
+    // get a list of conversations
+    const result = await app.client.conversations.list({
+      // app token
+      appToken: appToken,
+    });
+
+    // check if channel name == input name
+    for (const channel of result.channels) {
+      if (channel.name === name) {
+        conversationId = channel.id;
+        break;
+      }
+    }
+
+    // return found ID
+    return conversationId;
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// variable for slack channel
+const standupId = await findConversation("standup");
+
+// add item to Notion database
 async function addItem(title, text, userId, ts, tags, link) {
   try {
-    const tagArray = [];
 
+    // add tags with proper format
+    const tagArray = [];
     for (const tag of tags) {
       tagArray.push({ name: tag });
     }
 
+    // create page with correct properties and child using initialNotionItem function
     const response = await notion.pages.create({
       parent: { database_id: databaseId },
       properties: {
@@ -362,26 +448,31 @@ async function addItem(title, text, userId, ts, tags, link) {
 
       children: initialNotionItem(text, userId),
     });
-    
-    console.log(response)
+
+    console.log(response);
+
+    // return the url to be put in thread
     return response.url;
   } catch (error) {
     console.error(error);
   }
 }
 
-async function findDatabaseItem(threadts) {
+// find database item based on the threadts value from Slack and property from Notion
+async function findDatabaseItem(threadTs) {
   try {
+    // find Notion items with the correct threadts property
     const response = await notion.databases.query({
       database_id: databaseId,
       filter: {
         property: "TS",
         text: {
-          contains: threadts,
+          contains: threadTs,
         },
       },
     });
 
+    // code for testing what block formatting looks like
     // const blockId = response.results[0].id;
     // const children = await notion.blocks.children.list({
     //   block_id: blockId,
@@ -389,15 +480,17 @@ async function findDatabaseItem(threadts) {
     // });
     // console.log(children.results);
 
-    console.log(response.results[0].properties.Tags);
+    // return the ID of the page
     return response.results[0].id;
   } catch (error) {
     console.error(error);
   }
 }
 
+// append a body to a Notion page 
 async function addBody(id, text, userId) {
   try {
+    // use ID of page and newNotionItem function for formatting
     const response = await notion.blocks.children.append({
       block_id: id,
       children: newNotionItem(text, userId),
@@ -407,53 +500,37 @@ async function addBody(id, text, userId) {
   }
 }
 
-async function findConversation(name) {
+// make the list of tags for the channel topic
+async function setChannelTopic(currentTag) {
   try {
-    var conversationId = "";
-    // Call the conversations.list method using the built-in WebClient
-    const result = await app.client.conversations.list({
-      // The token you used to initialize your app
-      appToken: appToken,
-    });
-
-    for (const channel of result.channels) {
-      if (channel.name === name) {
-        conversationId = channel.id;
-        break;
-      }
-    }
-    return conversationId;
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-const standupId = await findConversation("standup");
-
-async function makeTagList(currentTag) {
-  try {
+    // get database and then list of tags in database
     const response = await notion.databases.retrieve({
       database_id: databaseId,
     });
-
     const tags = response.properties.Tags.multi_select.options;
 
+    // make a list of the current tags in the database
     var topic = "Current tags are: ";
     tags.forEach((tag) => {
       topic += tag.name + ", ";
     });
 
+    // set variable for reset channel topic
     var restart = false;
 
+    // for each tag in list of tags presented in the Slack message
     currentTag.forEach((tag) => {
+      // if the tag is not found add to list and set restart to true
       if (topic.search(tag) == -1) {
         topic += tag + ", ";
         restart = true;
       }
     });
 
-    topic = topic.slice(0, -2)
+    // get rid of last ", "
+    topic = topic.slice(0, -2);
 
+    // if it should be restarted, set the channel topic again
     if (restart == true) {
       const setTopic = await app.client.conversations.setTopic({
         token: token,
@@ -466,11 +543,11 @@ async function makeTagList(currentTag) {
   }
 }
 
+// reply to the Slack message with the Notion link
 async function replyMessage(id, ts, link) {
   try {
-    // Call the chat.postMessage method using the built-in WebClient
     const result = await app.client.chat.postMessage({
-      // The token you used to initialize your app
+      // bot token
       token: token,
       channel: id,
       thread_ts: ts,
@@ -481,46 +558,78 @@ async function replyMessage(id, ts, link) {
   }
 }
 
+// find the tags in the Slack message
 const findTags = (text) => {
-  let tags = [];
-  let index = text.toLowerCase().search("tags: ");
+  // search for Tags indicator
+  var index = text.toLowerCase().search("tags: ");
+
+  // if found
   if (index != -1) {
+    // bypass "tags: "
     index += 6;
+    // make a list by slicing from index to end and split on first line
     const tagList = text.slice(index, text.length).split("\n")[0];
-    tags = tagList.split(", ");
+
+    // make array of tags based on the split value
+    var tags = tagList.split(", ");
   }
+
+  // return array of tags
   return tags;
 };
 
+// create the title for the Notion page
 const makeTitle = (text) => {
+  // split based off of line break or emphasis punctuation 
   var title = text.split(/[\n\!\?]/)[0];
+
+  // replace the emojis
   title = replaceEmojis(title);
+
+  // make sure its not too long
   title = title.slice(0, 100);
+
+  // search for links
   if (title.search("http") != -1 || title.search("mailto") != -1) {
+    // split title based on link indicators <link>
     var regex = new RegExp(/[\<\>]/);
     var split = title.split(regex);
+
+    // initialize title
     title = "";
 
+    // for each line in the split text
     split.forEach((line) => {
+      
       if (line.search("http") != -1 || line.search("mailto") != -1) {
+        // if it is the link item, split the first half off and only push the text to title
         let lineSplit = line.split("|");
         title += lineSplit[1];
       } else {
+        // if it isn't, push the text to title
         title += line;
       }
     });
   }
+
+  // split the title based on "." (can't do above because links have ".") and return the first item
   title = title.split(".");
   return title[0];
 };
 
+// if a message is posted
 app.event("message", async ({ event, client }) => {
   console.log(event);
+
+  // make sure its the right channel
   if (event.channel == standupId) {
+    // get the tags
     var tags = await findTags(event.text);
 
+    // get the title
     const title = await makeTitle(event.text);
 
+    // get the link to the Slack message
     const slackLink = await app.client.chat.getPermalink({
       token: token,
       channel: event.channel,
@@ -529,11 +638,16 @@ app.event("message", async ({ event, client }) => {
 
     try {
       if ("thread_ts" in event) {
+        // if its a thread message, find the original Notion page and then append the Slack message
         const pageId = await findDatabaseItem(event.thread_ts);
         addBody(pageId, event.text, event.user);
       } else {
-        await makeTagList(tags);
+        // if its a parent message
 
+        // make the list of tags for the channel topic and push it if applicable
+        await setChannelTopic(tags);
+
+        // make the Notion page and push to database
         const notionItem = await addItem(
           title,
           event.text,
@@ -543,6 +657,7 @@ app.event("message", async ({ event, client }) => {
           slackLink.permalink
         );
 
+        // reply with the link returned by addItem
         await replyMessage(standupId, event.ts, notionItem);
       }
     } catch (error) {
