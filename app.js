@@ -32,7 +32,6 @@ const slackNotionId = {
 import he from "he";
 
 import fs from "fs";
-import { timeLog } from "console";
 
 let rawdata = fs.readFileSync("./slack_emoticons_to_html_unicode.json");
 let emojis = JSON.parse(rawdata);
@@ -99,45 +98,102 @@ const newCodeItem = (codeText) => {
   return array;
 };
 
+const newBoldItem = (codeText) => {
+  var array = {
+    type: "text",
+    text: {
+      content: codeText,
+    },
+    annotations: {
+      bold: true,
+    },
+  };
+  return array;
+};
+
+const newItalicItem = (codeText) => {
+  var array = {
+    type: "text",
+    text: {
+      content: codeText,
+    },
+    annotations: {
+      italic: true,
+    },
+  };
+  return array;
+};
+
+const newStrikeItem = (codeText) => {
+  var array = {
+    type: "text",
+    text: {
+      content: codeText,
+    },
+    annotations: {
+      strikethrough: true,
+    },
+  };
+  return array;
+};
+
 const newChild = (splitItem) => {
-  console.log(splitItem)
   var notionAppendItem = [];
 
   splitItem.forEach((item) => {
-    if (item.search("http") != -1) {
+    if ((item.search(/https?/) != -1) | (item.search(/mailto/) != -1)) {
       item = item.replace("\n", "");
       let linkSplit = item.split("|");
 
       const notionLinkItem = newLinkItem(linkSplit[1], linkSplit[0]);
       notionAppendItem.push(notionLinkItem);
-    } else if (item.search(":") != -1) {
-      item = item.replace("\n", "");
-      var string = replaceEmojis(item);
-      const textItem = newTextItem(string);
-      notionAppendItem.push(textItem);
     } else if (item.search("@") != -1) {
       item = item.replace("\n", "");
       var string = item.replace("@", "");
       const userItem = newUserItem(string, slackNotionId);
       notionAppendItem.push(userItem);
-    } else if (item.search("`") != -1) {
-      item = item.replace("\n", "");
-      var splitString = item.split("`");
-      console.log(splitString);
-      const textItem = newTextItem(splitString[0]);
-      notionAppendItem.push(textItem);
-      console.log(textItem);
-      const codeItem = newCodeItem(splitString[1]);
-      notionAppendItem.push(codeItem);
-      console.log(codeItem);
-      if (splitString[2] != undefined) {
-        const textItem2 = newTextItem(splitString[2]);
-        notionAppendItem.push(textItem2);
-        console.log(textItem2);
-      }
+    } else if (item.search(/[\`\_\*\~]/) != -1) {
+      item = replaceEmojis(item);
+      item = item.replace(/\n/gi, "");
+      item = item.replace(/[\*](?=[a-zA-Z0-9])/, "=*");
+      item = item.replace(/(?<=[a-zA-Z0-9,])[\*]/, "*=");
+      item = item.replace(/[\`](?=[a-zA-Z0-9])/, "=`");
+      item = item.replace(/(?<=[a-zA-Z0-9,])[\``]/, "`=");
+      item = item.replace(/[\_](?=[a-zA-Z0-9])/, "=_");
+      item = item.replace(/(?<=[a-zA-Z0-9,])[\_]/, "_=");
+      item = item.replace(/[\~](?=[a-zA-Z0-9])/, "=~");
+      item = item.replace(/(?<=[a-zA-Z0-9,])[\~]/, "~=");
+      // item = item.replace(/\n/gi, "");
+      var split = item.split(/(\=)/gi);
+
+      split = split.filter(test => test.search("=") != 0);
+      split.forEach((split) => {
+        if (split.search("`") != -1) {
+          split = split.replace(/\`/gi, "")
+          const item = newCodeItem(split);
+          notionAppendItem.push(item);
+        } else if (split.search("_") != -1) {
+          split = split.replace(/\_/gi, "")
+          const item = newItalicItem(split);
+          notionAppendItem.push(item);
+        } else if (split.search(/[\*]/) != -1) {
+          split = split.replace(/\*/gi, "")
+          const item = newBoldItem(split);
+          notionAppendItem.push(item);
+        } else if (split.search("~") != -1) {
+          split = split.replace(/\~/gi, "")
+          const item = newStrikeItem(split);
+          notionAppendItem.push(item);
+        } else {
+          split = split.replace(/=/gi, "");
+          const textItem = newTextItem(split);
+          notionAppendItem.push(textItem);
+        }
+      });
     } else {
       item = item.replace("\n", "");
-      const textItem = newTextItem(item);
+      var string = replaceEmojis(item);
+      const textItem = newTextItem(string);
       notionAppendItem.push(textItem);
     }
   });
@@ -191,7 +247,6 @@ const newNotionItem = (slackMessage, userId) => {
     var regex = new RegExp(/[\<\>]/);
 
     var split = line.split(regex);
-
     var item = newChild(split);
 
     const childItem = {
@@ -230,9 +285,7 @@ const initialNotionItem = (slackMessage, userId) => {
 
   newLineSplit.forEach((line) => {
     var regex = new RegExp(/[\<\>]/);
-
     var split = line.split(regex);
-
     var item = newChild(split);
 
     const childItem = {
@@ -372,7 +425,7 @@ async function findConversation(name) {
   }
 }
 
-const standupId = await findConversation("test-standup");
+const standupId = await findConversation("standup");
 
 async function replyMessage(id, ts, link) {
   try {
