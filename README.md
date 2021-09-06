@@ -1,9 +1,9 @@
-# Welcome to the only Slack to Notion standup integration you'll ever need
-### This was wayyyy more difficult than it looks
+# 👋 Welcome to the only Slack to Notion standup integration you'll ever need
+### This was wayyyy more difficult than it looks 😢
 
 Wow I learned a ton doing this. Slack and Notion have great APIs and helpful docs, but being as new to this as I am, it took a lot of trial and error. A big part of this was figuring out how to translate Slack messages into stuff Notion can understand. You can find that whole project [here](https://github.com/victoriaslocum752/slack-notion-translation). 
 
-# Features
+# Features 📊
 ## Parent Message
 This code will send a parent Slack message to a Notion database, complete with a title, properties, and a perfectly formatted body.  
 
@@ -40,7 +40,7 @@ It will also update a Notion page with the thread message, with all the correct 
 @Victoria Slocum says: This is a great additional item to a Notion page!! 
 ```
 
-## Channel Topic
+## Channel Topic 🥇
 We found it helpful to have the channel topic be updated with the currect tags in use.  
 
 This code will automatically update the channel topic when a new tag is added!!  
@@ -48,9 +48,9 @@ This code will automatically update the channel topic when a new tag is added!!
 ## Reply with Link
 The Standup Bot will reply in the thread with the link to the created Notion page
 
-# Overall flow
+# Overall flow 🌊
 
 (insert images here)
 
-## Anyways
+## Anyways 👋
 Hey, I'm Victoria, and you can find my website [here](https://victoriaslocum.com) and the blog post for this page [here](https://comingsoon.com)
