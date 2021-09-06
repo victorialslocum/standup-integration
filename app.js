@@ -166,22 +166,22 @@ const newChild = (splitItem) => {
       // item = item.replace(/\n/gi, "");
       var split = item.split(/(\=)/gi);
 
-      split = split.filter(test => test.search("=") != 0);
+      split = split.filter((test) => test.search("=") != 0);
       split.forEach((split) => {
         if (split.search("`") != -1) {
-          split = split.replace(/\`/gi, "")
+          split = split.replace(/\`/gi, "");
           const item = newCodeItem(split);
           notionAppendItem.push(item);
         } else if (split.search("_") != -1) {
-          split = split.replace(/\_/gi, "")
+          split = split.replace(/\_/gi, "");
           const item = newItalicItem(split);
           notionAppendItem.push(item);
         } else if (split.search(/[\*]/) != -1) {
-          split = split.replace(/\*/gi, "")
+          split = split.replace(/\*/gi, "");
           const item = newBoldItem(split);
           notionAppendItem.push(item);
         } else if (split.search("~") != -1) {
-          split = split.replace(/\~/gi, "")
+          split = split.replace(/\~/gi, "");
           const item = newStrikeItem(split);
           notionAppendItem.push(item);
         } else {
@@ -362,6 +362,8 @@ async function addItem(title, text, userId, ts, tags, link) {
 
       children: initialNotionItem(text, userId),
     });
+    
+    console.log(response)
     return response.url;
   } catch (error) {
     console.error(error);
@@ -387,6 +389,7 @@ async function findDatabaseItem(threadts) {
     // });
     // console.log(children.results);
 
+    console.log(response.results[0].properties.Tags);
     return response.results[0].id;
   } catch (error) {
     console.error(error);
@@ -426,6 +429,42 @@ async function findConversation(name) {
 }
 
 const standupId = await findConversation("standup");
+
+async function makeTagList(currentTag) {
+  try {
+    const response = await notion.databases.retrieve({
+      database_id: databaseId,
+    });
+
+    const tags = response.properties.Tags.multi_select.options;
+
+    var topic = "Current tags are: ";
+    tags.forEach((tag) => {
+      topic += tag.name + ", ";
+    });
+
+    var restart = false;
+
+    currentTag.forEach((tag) => {
+      if (topic.search(tag) == -1) {
+        topic += tag + ", ";
+        restart = true;
+      }
+    });
+
+    topic = topic.slice(0, -2)
+
+    if (restart == true) {
+      const setTopic = await app.client.conversations.setTopic({
+        token: token,
+        channel: standupId,
+        topic: topic,
+      });
+    }
+  } catch (error) {
+    console.error(error);
+  }
+}
 
 async function replyMessage(id, ts, link) {
   try {
@@ -493,6 +532,8 @@ app.event("message", async ({ event, client }) => {
         const pageId = await findDatabaseItem(event.thread_ts);
         addBody(pageId, event.text, event.user);
       } else {
+        await makeTagList(tags);
+
         const notionItem = await addItem(
           title,
           event.text,
@@ -502,7 +543,7 @@ app.event("message", async ({ event, client }) => {
           slackLink.permalink
         );
 
-        replyMessage(standupId, event.ts, notionItem);
+        await replyMessage(standupId, event.ts, notionItem);
       }
     } catch (error) {
       console.error(error);
