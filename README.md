@@ -40,7 +40,7 @@ It will also update a Notion page with the thread message, with all the correct 
 @Victoria Slocum says: This is a great additional item to a Notion page!! 
 ```
 
-## Channel Topic 🥇
+## Channel Topic
 We found it helpful to have the channel topic be updated with the currect tags in use.  
 
 This code will automatically update the channel topic when a new tag is added!!  
