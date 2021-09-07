@@ -241,6 +241,8 @@ const newChild = (splitItem) => {
     } else {
       // if the string is normal, then replace emojis and push text item
       var string = replaceEmojis(item);
+      string = string.replace("!channel", "@channel");
+      string = string.replace("!here", "@here");
       const textItem = newTextItem(string);
       notionItem.push(textItem);
     }
@@ -387,7 +389,7 @@ async function findConversation(name) {
 }
 
 // variable for slack channel
-const standupId = await findConversation("standup");
+const standupId = await findConversation("test-standup");
 
 // add item to Notion database
 async function addItem(title, text, userId, ts, tags, link) {
@@ -606,18 +608,18 @@ async function findTags(text) {
       // make array of tags based on the split value
       var slackTagArray = tagList.split(", ");
 
-      var index = 0
+      var index = 0;
       slackTagArray.forEach((stag) => {
-        console.log("s: ",stag)
+        console.log("s: ", stag);
         dbTagArray.forEach((dbtag) => {
           if (stag.toLowerCase() == dbtag.toLowerCase()) {
-            console.log("db: ", dbtag)
+            console.log("db: ", dbtag);
             tags.push(dbtag);
-            index += 1
+            index += 1;
           } else if (index == dbTagArray.length) {
-            tags.push(stag)
+            tags.push(stag);
           } else {
-            index += 1
+            index += 1;
           }
         });
       });
@@ -638,9 +640,6 @@ async function makeTitle(text) {
 
   // replace the emojis
   title = replaceEmojis(title);
-
-  // make sure its not too long
-  title = title.slice(0, 100);
 
   // search for links
   if (title.search("http") != -1 || title.search("mailto") != -1) {
@@ -685,10 +684,19 @@ async function makeTitle(text) {
     );
   }
 
+  // replace weird slack formatting with more understandable stuff
+  if (title.search("!channel") != -1 || title.search("!here") != -1) {
+    title = title.replace("<!channel>", "@channel");
+    title = title.replace("<!here>", "@here");
+  }
+
+  // make sure its not too long
+  title = title.slice(0, 100);
+
   // split the title based on "." and "!"
-  // (can't do above because links have "." and @channel has "!") 
+  // (can't do above because links have "." and @channel has "!")
   // and return the first item
-  title = title.split(/[\.\!])/)[0];
+  title = title.split(/[\.\!]/)[0];
   return title;
 }
 
