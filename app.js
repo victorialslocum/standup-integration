@@ -239,7 +239,7 @@ const newChild = (splitItem) => {
         }
       });
     } else {
-      // if the string is normal, then replace emojis and push text item
+      // if the string is normal, then replace emojis and if any mentions and push text item
       var string = replaceEmojis(item);
       string = string.replace("!channel", "@channel");
       string = string.replace("!here", "@here");
@@ -344,11 +344,16 @@ const initialNotionItem = (slackMessage) => {
   // empty Notion Item instead of reply format
   const notionItem = [];
 
+  // for each line in the Slack message
   newLineSplit.forEach((line) => {
+    // split based on link/user markers
     var regex = new RegExp(/[\<\>]/);
     var split = line.split(regex);
+
+    // make a child from these splits
     var item = newChild(split);
 
+    // properly format child
     const childItem = {
       object: "block",
       type: "paragraph",
@@ -566,6 +571,7 @@ async function replyMessage(id, ts, link) {
   }
 }
 
+// find the Slack username of the user using the Slack ID
 async function findUserName(user) {
   try {
     const result = await app.client.users.profile.get({
@@ -608,25 +614,29 @@ async function findTags(text) {
       // make array of tags based on the split value
       var slackTagArray = tagList.split(", ");
 
-      var index = 0;
+      // for each found Slack tag
       slackTagArray.forEach((stag) => {
-        console.log("s: ", stag);
+        // set counter
+        var index = 0;
+        // for each Notion database tag
         dbTagArray.forEach((dbtag) => {
           if (stag.toLowerCase() == dbtag.toLowerCase()) {
-            console.log("db: ", dbtag);
+            // if the tags match, push the database tag
             tags.push(dbtag);
-            index += 1;
-          } else if (index == dbTagArray.length) {
-            tags.push(stag);
           } else {
+            // if they don't, count
             index += 1;
+          }
+
+          // if it went through all of the database items, push the Slack tag
+          if (index == dbTagArray.length) {
+            tags.push(stag);
           }
         });
       });
     }
 
     // return array of tags
-
     return tags;
   } catch (error) {
     console.error(error);
