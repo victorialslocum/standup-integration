@@ -389,7 +389,7 @@ async function findConversation(name) {
 }
 
 // variable for slack channel
-const standupId = await findConversation("test-standup");
+const standupId = await findConversation("standup");
 
 // add item to Notion database
 async function addItem(title, text, userId, ts, tags, link) {
