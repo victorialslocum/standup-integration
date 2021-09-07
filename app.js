@@ -184,9 +184,14 @@ const newChild = (splitItem) => {
       // replace indicator symbol
       var string = item.replace("@", "");
 
-      // create a new user item and push to notionItem
-      const userItem = newUserItem(string, slackNotionId);
-      notionItem.push(userItem);
+      if (string in slackNotionId) {
+        // create a new user item and push to notionItem
+        const userItem = newUserItem(string, slackNotionId);
+        notionItem.push(userItem);
+      } else {
+        const textItem = newTextItem(item);
+        notionItem.push(textItem);
+      }
     } else if (item.search(/[\`\_\*\~]/) != -1) {
       // if a string contains any special annotations (bold, italic, code, strikethrough)
 
@@ -359,7 +364,7 @@ const initialNotionItem = (slackMessage, userId) => {
 async function findConversation(name) {
   try {
     var conversationId = "";
-  
+
     // get a list of conversations
     const result = await app.client.conversations.list({
       // app token
@@ -382,12 +387,11 @@ async function findConversation(name) {
 }
 
 // variable for slack channel
-const standupId = await findConversation("standup");
+const standupId = await findConversation("test-standup");
 
 // add item to Notion database
 async function addItem(title, text, userId, ts, tags, link) {
   try {
-
     // add tags with proper format
     const tagArray = [];
     for (const tag of tags) {
@@ -487,7 +491,7 @@ async function findDatabaseItem(threadTs) {
   }
 }
 
-// append a body to a Notion page 
+// append a body to a Notion page
 async function addBody(id, text, userId) {
   try {
     // use ID of page and newNotionItem function for formatting
@@ -553,34 +557,83 @@ async function replyMessage(id, ts, link) {
       thread_ts: ts,
       text: link,
     });
+
+    return;
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function findUserName(user) {
+  try {
+    const result = await app.client.users.profile.get({
+      // bot token and Slack user ID
+      token: token,
+      user: user,
+    });
+    return result.profile.display_name;
   } catch (error) {
     console.error(error);
   }
 }
 
 // find the tags in the Slack message
-const findTags = (text) => {
-  // search for Tags indicator
-  var index = text.toLowerCase().search("tags: ");
+async function findTags(text) {
+  try {
+    // get database and then list of tags in database
+    const response = await notion.databases.retrieve({
+      database_id: databaseId,
+    });
+    const databaseTags = response.properties.Tags.multi_select.options;
 
-  // if found
-  if (index != -1) {
-    // bypass "tags: "
-    index += 6;
-    // make a list by slicing from index to end and split on first line
-    const tagList = text.slice(index, text.length).split("\n")[0];
+    // make a list of the current tags in the database
+    var dbTagArray = [];
+    databaseTags.forEach((dbtag) => {
+      dbTagArray.push(dbtag.name);
+    });
 
-    // make array of tags based on the split value
-    var tags = tagList.split(", ");
+    var tags = [];
+    // search for Tags indicator
+    var index = text.toLowerCase().search("tags: ");
+
+    // if found
+    if (index != -1) {
+      // bypass "tags: "
+      index += 6;
+      // make a list by slicing from index to end and split on first line
+      const tagList = text.slice(index, text.length).split("\n")[0];
+
+      // make array of tags based on the split value
+      var slackTagArray = tagList.split(", ");
+
+      var index = 0
+      slackTagArray.forEach((stag) => {
+        console.log("s: ",stag)
+        dbTagArray.forEach((dbtag) => {
+          if (stag.toLowerCase() == dbtag.toLowerCase()) {
+            console.log("db: ", dbtag)
+            tags.push(dbtag);
+            index += 1
+          } else if (index == dbTagArray.length) {
+            tags.push(stag)
+          } else {
+            index += 1
+          }
+        });
+      });
+    }
+
+    // return array of tags
+
+    return tags;
+  } catch (error) {
+    console.error(error);
   }
-
-  // return array of tags
-  return tags;
-};
+}
 
 // create the title for the Notion page
-const makeTitle = (text) => {
-  // split based off of line break or emphasis punctuation 
+async function makeTitle(text) {
+  // split based off of line break or emphasis punctuation
   var title = text.split(/[\n\!\?]/)[0];
 
   // replace the emojis
@@ -600,7 +653,6 @@ const makeTitle = (text) => {
 
     // for each line in the split text
     split.forEach((line) => {
-      
       if (line.search("http") != -1 || line.search("mailto") != -1) {
         // if it is the link item, split the first half off and only push the text to title
         let lineSplit = line.split("|");
@@ -612,10 +664,31 @@ const makeTitle = (text) => {
     });
   }
 
+  if (title.search("@") != -1) {
+    // split title based on link indicators <link>
+    var regex = new RegExp(/[\<\>]/);
+    var split = title.split(regex);
+
+    // find all instances of users and then replace in title with their Slack user name
+    // wait til this promise is completed before moving on
+    await Promise.all(
+      split.map(async (line) => {
+        if (line.search("@") != -1) {
+          const userId = line.replace("@", "");
+          if (userId in slackNotionId) {
+            var userName = await findUserName(userId);
+            var regexReplace = new RegExp(["<" + line + ">"]);
+            title = title.replace(regexReplace, userName);
+          }
+        }
+      })
+    );
+  }
+
   // split the title based on "." (can't do above because links have ".") and return the first item
   title = title.split(".");
   return title[0];
-};
+}
 
 // if a message is posted
 app.event("message", async ({ event, client }) => {
@@ -643,10 +716,8 @@ app.event("message", async ({ event, client }) => {
         addBody(pageId, event.text, event.user);
       } else {
         // if its a parent message
-
         // make the list of tags for the channel topic and push it if applicable
         await setChannelTopic(tags);
-
         // make the Notion page and push to database
         const notionItem = await addItem(
           title,
