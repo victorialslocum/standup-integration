@@ -320,7 +320,7 @@ const newNotionItem = (slackMessage, userId) => {
 };
 
 // same thing as above except for inital messages not replies
-const initialNotionItem = (slackMessage, userId) => {
+const initialNotionItem = (slackMessage) => {
   var newLineSplit = slackMessage.split("\n");
   newLineSplit = newLineSplit.filter(Boolean);
 
@@ -450,7 +450,7 @@ async function addItem(title, text, userId, ts, tags, link) {
         },
       },
 
-      children: initialNotionItem(text, userId),
+      children: initialNotionItem(text),
     });
 
     console.log(response);
@@ -634,7 +634,7 @@ async function findTags(text) {
 // create the title for the Notion page
 async function makeTitle(text) {
   // split based off of line break or emphasis punctuation
-  var title = text.split(/[\n\!\?]/)[0];
+  var title = text.split(/[\n\?]/)[0];
 
   // replace the emojis
   title = replaceEmojis(title);
@@ -685,9 +685,11 @@ async function makeTitle(text) {
     );
   }
 
-  // split the title based on "." (can't do above because links have ".") and return the first item
-  title = title.split(".");
-  return title[0];
+  // split the title based on "." and "!"
+  // (can't do above because links have "." and @channel has "!") 
+  // and return the first item
+  title = title.split(/[\.\!])/)[0];
+  return title;
 }
 
 // if a message is posted

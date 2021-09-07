@@ -10,7 +10,7 @@ This code will send a parent Slack message to a Notion database, complete with a
 
 ### Title  
 - split based on any punctuation mark or a new line
-- formatted without link ickness
+- formatted without link or user ickness
 - character limit of 100
 - emojis!!  
 
