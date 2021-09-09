@@ -710,6 +710,31 @@ async function makeTitle(text) {
   return title;
 }
 
+async function addTags(pageId, tags) {
+  try {
+    // add tags with proper format
+    const tagArray = [];
+    for (const tag of tags) {
+      tagArray.push({ name: tag });
+    }
+
+    // 
+    const response = await notion.pages.update({
+      page_id: pageId,
+      properties: {
+        Tags: { 
+          name: 'Tags',
+          type: 'multi_select',
+          multi_select: tagArray,
+        },
+      },
+    });
+    console.log(response);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
 // if a message is posted
 app.event("message", async ({ event, client }) => {
   console.log(event);
@@ -719,6 +744,7 @@ app.event("message", async ({ event, client }) => {
     // get the tags
     var tags = await findTags(event.text);
 
+    console.log(tags)
     // get the title
     const title = await makeTitle(event.text);
 
@@ -734,6 +760,9 @@ app.event("message", async ({ event, client }) => {
         // if its a thread message, find the original Notion page and then append the Slack message
         const pageId = await findDatabaseItem(event.thread_ts);
         addBody(pageId, event.text, event.user);
+        if (tags.length != 0) {
+          addTags(pageId, tags)
+        }
       } else {
         // if its a parent message
         // make the list of tags for the channel topic and push it if applicable
