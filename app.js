@@ -646,7 +646,7 @@ async function findTags(text) {
 // create the title for the Notion page
 async function makeTitle(text) {
   // split based off of line break or emphasis punctuation
-  var title = text.split(/[\n\?]/)[0];
+  var title = text.split(/[\n]/)[0];
 
   // replace the emojis
   title = replaceEmojis(title);
@@ -672,6 +672,8 @@ async function makeTitle(text) {
       }
     });
   }
+
+  console.log(title)
 
   if (title.search("@") != -1) {
     // split title based on link indicators <link>
@@ -703,10 +705,14 @@ async function makeTitle(text) {
   // make sure its not too long
   title = title.slice(0, 100);
 
+  console.log(title)
+
   // split the title based on "." and "!"
-  // (can't do above because links have "." and @channel has "!")
+  // (can't do above because links have "." and "?" and @channel has "!")
   // and return the first item
-  title = title.split(/[\.\!]/)[0];
+  title = title.split(/[\.\!\?]/)[0];
+
+  console.log(title)
   return title;
 }
 
