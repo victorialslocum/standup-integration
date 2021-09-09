@@ -5,7 +5,6 @@ const { App } = pkg;
 // create variables for Slack Bot, App, and User tokens
 const token = process.env.SLACK_BOT_TOKEN;
 const appToken = process.env.SLACK_APP_TOKEN;
-const userToken = process.env.SLACK_USER_TOKEN;
 
 // create Slack app
 const app = new App({
@@ -57,13 +56,12 @@ const replaceEmojis = (string) => {
         if (word.search(":" + key + ":") != -1) {
           var regexKey = new RegExp(key);
           string = string.replace(regexKey, he.decode(emojis[key]));
+          // replace all the ":" in the string and return
+          string = string.replace(/:/gi, "");
         }
       }
     }
   });
-
-  // replace all the ":" in the string and return
-  string = string.replace(/:/gi, "");
   return string;
 };
 
@@ -673,8 +671,6 @@ async function makeTitle(text) {
     });
   }
 
-  console.log(title)
-
   if (title.search("@") != -1) {
     // split title based on link indicators <link>
     var regex = new RegExp(/[\<\>]/);
@@ -705,17 +701,14 @@ async function makeTitle(text) {
   // make sure its not too long
   title = title.slice(0, 100);
 
-  console.log(title)
-
   // split the title based on "." and "!"
   // (can't do above because links have "." and "?" and @channel has "!")
   // and return the first item
   title = title.split(/[\.\!\?]/)[0];
-
-  console.log(title)
   return title;
 }
 
+// append more tags to an already existing page
 async function addTags(pageId, tags) {
   try {
     // add tags with proper format
@@ -724,27 +717,24 @@ async function addTags(pageId, tags) {
       tagArray.push({ name: tag });
     }
 
+    // get already existing tags
     const page = await notion.pages.retrieve({ page_id: pageId });
+    var oldTags = page.properties.Tags.multi_select;
 
-    var oldTags = page.properties.Tags.multi_select
+    // create conjoined array
+    var newTags = oldTags.concat(tagArray);
 
-    console.log(oldTags)
-
-    var newTags = oldTags.concat(tagArray)
-
-    console.log(newTags)
-    // 
+    // update the Notion page with the tags
     const response = await notion.pages.update({
       page_id: pageId,
       properties: {
-        Tags: { 
-          name: 'Tags',
-          type: 'multi_select',
+        Tags: {
+          name: "Tags",
+          type: "multi_select",
           multi_select: newTags,
         },
       },
     });
-    console.log(response);
   } catch (error) {
     console.error(error);
   }
@@ -759,7 +749,6 @@ app.event("message", async ({ event, client }) => {
     // get the tags
     var tags = await findTags(event.text);
 
-    console.log(tags)
     // get the title
     const title = await makeTitle(event.text);
 
@@ -776,7 +765,7 @@ app.event("message", async ({ event, client }) => {
         const pageId = await findDatabaseItem(event.thread_ts);
         addBody(pageId, event.text, event.user);
         if (tags.length != 0) {
-          addTags(pageId, tags)
+          addTags(pageId, tags);
         }
       } else {
         // if its a parent message
