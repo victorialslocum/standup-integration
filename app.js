@@ -724,6 +724,15 @@ async function addTags(pageId, tags) {
       tagArray.push({ name: tag });
     }
 
+    const page = await notion.pages.retrieve({ page_id: pageId });
+
+    var oldTags = page.properties.Tags.multi_select
+
+    console.log(oldTags)
+
+    var newTags = oldTags.concat(tagArray)
+
+    console.log(newTags)
     // 
     const response = await notion.pages.update({
       page_id: pageId,
@@ -731,7 +740,7 @@ async function addTags(pageId, tags) {
         Tags: { 
           name: 'Tags',
           type: 'multi_select',
-          multi_select: tagArray,
+          multi_select: newTags,
         },
       },
     });
