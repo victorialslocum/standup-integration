@@ -35,6 +35,7 @@ const slackNotionId = {
 // for emojis
 import he from "he";
 import fs from "fs";
+import { ConsoleLogger } from "@slack/logger";
 
 // import slack to html emoji dictionary
 let rawdata = fs.readFileSync("./slack_emoticons_to_html_unicode.json");
@@ -392,7 +393,7 @@ async function findConversation(name) {
 }
 
 // variable for slack channel
-const standupId = await findConversation("standup");
+const standupId = await findConversation("test-standup");
 
 // add item to Notion database
 async function addItem(title, text, userId, ts, tags, link) {
@@ -672,20 +673,19 @@ async function makeTitle(text) {
   }
 
   if (title.search("@") != -1) {
-    // split title based on link indicators <link>
-    var regex = new RegExp(/[\<\>]/);
-    var split = title.split(regex);
+    console.log(title)
+    var split = title.split(" ");
 
+    console.log(split)
     // find all instances of users and then replace in title with their Slack user name
     // wait til this promise is completed before moving on
     await Promise.all(
-      split.map(async (line) => {
-        if (line.search("@") != -1) {
-          const userId = line.replace("@", "");
+      split.map(async (word) => {
+        if (word.search("@") != -1) {
+          const userId = word.replace("@", "");
           if (userId in slackNotionId) {
             var userName = await findUserName(userId);
-            var regexReplace = new RegExp(["<" + line + ">"]);
-            title = title.replace(regexReplace, userName);
+            title = title.replace(word, userName);
           }
         }
       })
@@ -698,13 +698,12 @@ async function makeTitle(text) {
     title = title.replace("<!here>", "@here");
   }
 
-  // make sure its not too long
-  title = title.slice(0, 100);
-
   // split the title based on "." and "!"
   // (can't do above because links have "." and "?" and @channel has "!")
   // and return the first item
-  title = title.split(/[\.\!\?]/)[0];
+  title = title.split(/[\,\.\!\?]/)[0];
+  // make sure its not too long
+  title = title.slice(0, 100);
   return title;
 }
 
@@ -742,10 +741,9 @@ async function addTags(pageId, tags) {
 
 // if a message is posted
 app.event("message", async ({ event, client }) => {
-  console.log(event);
-
   // make sure its the right channel
   if (event.channel == standupId) {
+    console.log(event);
     // get the tags
     var tags = await findTags(event.text);
 
