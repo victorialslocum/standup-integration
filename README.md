@@ -1,4 +1,4 @@
-# 👋 Welcome to the only Slack to Notion standup integration you'll ever need
+# 👋 Welcome to my Slack/Notion standup integration!!
 ### This was wayyyy more difficult than it looks 😢
 
 Wow I learned a ton doing this. Slack and Notion have great APIs and helpful docs, but being as new to this as I am, it took a lot of trial and error. A big part of this was figuring out how to translate Slack messages into stuff Notion can understand. You can find that whole project [here](https://github.com/victoriaslocum752/slack-notion-translation). 
