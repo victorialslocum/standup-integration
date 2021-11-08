@@ -30,6 +30,7 @@ const slackNotionId = {
   U0224KFNYRW: "7c02e0ba-2aec-4696-a91d-ecaa01b616ce",
   U025J9SLXV3: "94f6b8b7-e8b0-4790-8265-f08e6b1d550c",
   UT9G67YFM: "6c3a6ec1-4b99-4e5c-8214-cea14fd9b142",
+  U02JNCBB4CB: "13194324-ab4b-4bf8-a195-93cd750812d1",
 };
 
 // for emojis
