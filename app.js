@@ -683,7 +683,8 @@ async function makeTitle(text) {
     await Promise.all(
       split.map(async (word) => {
         if (word.search("@") != -1) {
-          const userId = word.replace("@", "");
+          var userId = word.replace("@", "");
+          userId = userId.replace(/[\<\>]/g)
           if (userId in slackNotionId) {
             var userName = await findUserName(userId);
             title = title.replace(word, userName);
