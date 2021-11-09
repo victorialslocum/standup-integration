@@ -452,6 +452,7 @@ async function addItem(title, text, userId, ts, tags, link) {
               text: {
                 content: link,
               },
+            
             },
           ],
         },
@@ -579,7 +580,12 @@ async function findUserName(user) {
       token: token,
       user: user,
     });
-    return result.profile.display_name;
+    console.log(result)
+    if (result.profile.display_name) {
+        return result.profile.display_name
+    } else {
+        return result.profile.real_name
+    }
   } catch (error) {
     console.error(error);
   }
@@ -675,7 +681,7 @@ async function makeTitle(text) {
 
   if (title.search("@") != -1) {
     console.log(title)
-    var split = title.split(" ");
+    var split = title.split(/[\<\>]/g);
 
     console.log(split)
     // find all instances of users and then replace in title with their Slack user name
@@ -683,16 +689,20 @@ async function makeTitle(text) {
     await Promise.all(
       split.map(async (word) => {
         if (word.search("@") != -1) {
+          console.log(word)
           var userId = word.replace("@", "");
-          userId = userId.replace(/[\<\>]/g)
           if (userId in slackNotionId) {
             var userName = await findUserName(userId);
             title = title.replace(word, userName);
+            console.log(title)
           }
         }
       })
     );
   }
+  
+  title = title.replace(/[\<\>]/g, "");
+  console.log(title)
 
   // replace weird slack formatting with more understandable stuff
   if (title.search("!channel") != -1 || title.search("!here") != -1) {
@@ -703,7 +713,7 @@ async function makeTitle(text) {
   // split the title based on "." and "!"
   // (can't do above because links have "." and "?" and @channel has "!")
   // and return the first item
-  title = title.split(/[\,\.\!\?]/)[0];
+  title = title.split(/[\.\!\?]/)[0];
   // make sure its not too long
   title = title.slice(0, 100);
   return title;
