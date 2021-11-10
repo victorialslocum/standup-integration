@@ -175,8 +175,12 @@ const newChild = (splitItem) => {
       // split link into text and link
       let linkSplit = item.split("|");
 
-      // create link item and push to notionItem
-      const linkItem = newLinkItem(linkSplit[1], linkSplit[0]);
+      if (linkSplit[1]) {
+        // create link item and push to notionItem
+        var linkItem = newLinkItem(linkSplit[1], linkSplit[0]);
+      } else {
+        var linkItem = newLinkItem(linkSplit[0], linkSplit[0])
+      }
       notionItem.push(linkItem);
     } else if (item.search("@") != -1) {
       // see if it is a user by searching for the @ symbol
