@@ -179,7 +179,7 @@ const newChild = (splitItem) => {
         // create link item and push to notionItem
         var linkItem = newLinkItem(linkSplit[1], linkSplit[0]);
       } else {
-        var linkItem = newLinkItem(linkSplit[0], linkSplit[0])
+        var linkItem = newLinkItem(linkSplit[0], linkSplit[0]);
       }
       notionItem.push(linkItem);
     } else if (item.search("@") != -1) {
@@ -456,7 +456,6 @@ async function addItem(title, text, userId, ts, tags, link) {
               text: {
                 content: link,
               },
-            
             },
           ],
         },
@@ -584,11 +583,10 @@ async function findUserName(user) {
       token: token,
       user: user,
     });
-    console.log(result)
     if (result.profile.display_name) {
-        return result.profile.display_name
+      return result.profile.display_name;
     } else {
-        return result.profile.real_name
+      return result.profile.real_name;
     }
   } catch (error) {
     console.error(error);
@@ -684,29 +682,23 @@ async function makeTitle(text) {
   }
 
   if (title.search("@") != -1) {
-    console.log(title)
     var split = title.split(/[\<\>]/g);
-
-    console.log(split)
     // find all instances of users and then replace in title with their Slack user name
     // wait til this promise is completed before moving on
     await Promise.all(
       split.map(async (word) => {
         if (word.search("@") != -1) {
-          console.log(word)
           var userId = word.replace("@", "");
           if (userId in slackNotionId) {
             var userName = await findUserName(userId);
             title = title.replace(word, userName);
-            console.log(title)
           }
         }
       })
     );
   }
-  
+
   title = title.replace(/[\<\>]/g, "");
-  console.log(title)
 
   // replace weird slack formatting with more understandable stuff
   if (title.search("!channel") != -1 || title.search("!here") != -1) {
@@ -758,13 +750,19 @@ async function addTags(pageId, tags) {
 // if a message is posted
 app.event("message", async ({ event, client }) => {
   // make sure its the right channel
-  if (event.channel == standupId) {
+  if (event.channel == standupId && !!event.hidden != true) {
     console.log(event);
-    // get the tags
-    var tags = await findTags(event.text);
 
-    // get the title
-    const title = await makeTitle(event.text);
+    var tags = [];
+    var title = "";
+
+    if (event.text) {
+      // get the tags
+      tags = await findTags(event.text);
+
+      // get the title
+      title = await makeTitle(event.text);
+    }
 
     // get the link to the Slack message
     const slackLink = await app.client.chat.getPermalink({
