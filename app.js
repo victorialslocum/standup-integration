@@ -682,13 +682,13 @@ async function makeTitle(text) {
   }
 
   if (title.search("@") != -1) {
-    var split = title.split(/[\<\>]/g);
+    var split = title.split(" ");
     // find all instances of users and then replace in title with their Slack user name
     // wait til this promise is completed before moving on
     await Promise.all(
       split.map(async (word) => {
         if (word.search("@") != -1) {
-          var userId = word.replace("@", "");
+          var userId = word.replace(/[\<\>\@]/g, "");
           if (userId in slackNotionId) {
             var userName = await findUserName(userId);
             title = title.replace(word, userName);
@@ -755,13 +755,16 @@ app.event("message", async ({ event, client }) => {
 
     var tags = [];
     var title = "";
+    var text = "";
 
     if (event.text) {
+      // replace & sign
+      text = event.text.replace("&amp;", "&");
       // get the tags
-      tags = await findTags(event.text);
+      tags = await findTags(text);
 
       // get the title
-      title = await makeTitle(event.text);
+      title = await makeTitle(text);
     }
 
     // get the link to the Slack message
@@ -775,7 +778,7 @@ app.event("message", async ({ event, client }) => {
       if ("thread_ts" in event) {
         // if its a thread message, find the original Notion page and then append the Slack message
         const pageId = await findDatabaseItem(event.thread_ts);
-        addBody(pageId, event.text, event.user);
+        addBody(pageId, text, event.user);
         if (tags.length != 0) {
           addTags(pageId, tags);
         }
@@ -786,7 +789,7 @@ app.event("message", async ({ event, client }) => {
         // make the Notion page and push to database
         const notionItem = await addItem(
           title,
-          event.text,
+          text,
           event.user,
           event.ts,
           tags,
